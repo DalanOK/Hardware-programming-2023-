@@ -2,6 +2,12 @@
 #include "drivers/keyboard/keyboard.h"
 #include "drivers/timer/timer.h"
 #include "drivers/serial_port/serial_port.h"
+#include "fileSystem/file_system.h"
+#include "strComands/str.h"
+#include "shellControler/shellControler.h"
+#include "keyboardRules/keyboardRules.h"
+#include "messageControler/messageControler.h"
+#include "shellControler/sleep/sleep.h"
 
 void exception_handler(u32 interrupt, u32 error, char *message) {
     serial_log(LOG_ERROR, message);
@@ -18,7 +24,7 @@ void init_kernel() {
     set_exception_handler(exception_handler);
     enable_interrupts();
 }
-
+//static unsigned int screen = 0; // 0 - main 
 /**
  * Puts cursors in a given position. For example, position = 20 would place it in
  * the first line 20th column, position = 80 will place in the first column of the second line.
@@ -37,15 +43,48 @@ void put_cursor(unsigned short pos) {
 _Noreturn void halt_loop() {
     while (1) { halt(); }
 }
-
-void key_handler(struct keyboard_event event) {
-    if (event.key_character && event.type == EVENT_KEY_PRESSED) {
-        // process key press event
+void comand_manager(char* comand, char* command_argument) {
+    needToScrollCheck();
+    if (my_strcmp(comand, "clear") == 0) {
+        clear_shell();
+    }
+    else if (my_strcmp(comand, "edit") == 0) {
+        saveScreen();
+        edit_file(command_argument);
+    }
+    else if (my_strcmp(comand, "read") == 0) {
+        read_file(command_argument);
+    }
+    else if (my_strcmp(comand, "load") == 0) {
+        loadScreen();
+    }
+    else if (my_strcmp(comand, "create") == 0) {
+        create_file(command_argument);
+    }
+    else if (my_strcmp(comand, "list") == 0){
+        list_files();
+    }
+    else if (my_strcmp(comand, "delete") == 0) {
+        delete_file(command_argument);
+    }
+    else if (my_strcmp(comand, "sleep") == 0) {
+        screen = 1;
+    }
+    else {
+        write_message("No such command", 0x4);
     }
 }
 
+
+int sec = 0;
 void timer_tick_handler() {
-    // do something when timer ticks
+    sec++;
+ if (sec % 3 == 0){
+     if (screen == 1) {
+         sleep();
+     }
+}
+
 }
 
 /**
@@ -56,18 +95,6 @@ void kernel_entry() {
     keyboard_set_handler(key_handler);
     timer_set_handler(timer_tick_handler);
 
-    // demo of printing hello world to screen using framebuffer
-    char *message = "Hello world!";
-    char *framebuffer = (char *) 0xb8000;
-
-    while (*message != '\0') {
-        *framebuffer = *message;
-        *(framebuffer + 1) = (0xd << 4) | 0xb;
-        framebuffer += 2;
-        message++;
-    }
-
-    put_cursor(12);
-
+    clear_shell();
     halt_loop();
 }
